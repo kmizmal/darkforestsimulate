@@ -35,8 +35,8 @@ def checkDead(cv):
         cv.state = 0
     return cv
 
-def simulate_universe(max_frames=36000):
-    """模拟宇宙演化"""
+def simulate_universe(max_frames=36000, fps=30, record_interval=60):
+    """模拟宇宙演化，每2秒记录一次数据"""
     universe = [Civilization(random.randint(8000, 12000), random.randint(0, 2), random.randint(0, 1), i) for i in range(200)]
     data_frames = []
 
@@ -51,33 +51,36 @@ def simulate_universe(max_frames=36000):
             cv = checkDead(cv)
             other = checkDead(other)
 
-        # 收集当前帧的统计数据
-        alive = sum(1 for cv in universe if cv.state == 1)
-        marks = [cv.mark for cv in universe if cv.state == 1]
-        data_frames.append((frame, alive, sum(marks) / len(marks) if marks else 0))
+        # 每2秒（60帧）记录一次统计数据
+        if frame % record_interval == 0:
+            alive = sum(1 for cv in universe if cv.state == 1)
+            marks = [cv.mark for cv in universe if cv.state == 1]
+            data_frames.append((frame, alive, sum(marks) / len(marks) if marks else 0))
 
     return data_frames
-
-def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30, start_index=0):
-    """将每一帧数据绘制成图像并保存为视频"""
+    
+def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30, start_index=0, keyframe_interval=10):
+    """将每一帧数据绘制成图像并保存为视频（引入关键帧优化）"""
     if not os.path.exists("frames"):
         os.mkdir("frames")
 
-    for i, (frame, alive, avg_mark) in enumerate(data_frames):
-        plt.figure(figsize=(8, 6))
-        plt.title(f"Frame {frame}: Civilizations Alive = {alive}, Avg Mark = {avg_mark:.2f}")
-        plt.bar(["Alive Civilizations", "Average Mark"], [alive, avg_mark], color=["blue", "green"])
-        plt.savefig(f"frames/frame_{start_index + i:04d}.png")
-        plt.close()
-
-    # 使用 OpenCV 将图片合成为视频
     img_array = []
-    for filename in sorted(os.listdir("frames")):
-        if filename.endswith(".png"):
-            img = cv2.imread(os.path.join("frames", filename))
+    for i, (frame, alive, avg_mark) in enumerate(data_frames):
+        # 每隔keyframe_interval帧保存一次图像
+        if i % keyframe_interval == 0:
+            plt.figure(figsize=(8, 6))
+            plt.title(f"Frame {frame}: Civilizations Alive = {alive}, Avg Mark = {avg_mark:.2f}")
+            plt.bar(["Alive Civilizations", "Average Mark"], [alive, avg_mark], color=["blue", "green"])
+            plt.savefig(f"frames/frame_{start_index + i:04d}.png")
+            plt.close()
+        
+        # 将图片添加到视频列表
+        if i % keyframe_interval == 0 or i == len(data_frames) - 1:  # 只添加关键帧
+            img = cv2.imread(f"frames/frame_{start_index + i:04d}.png")
             height, width, _ = img.shape
             img_array.append(img)
 
+    # 使用 OpenCV 将关键帧合成为视频
     out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
     for img in img_array:
         out.write(img)
