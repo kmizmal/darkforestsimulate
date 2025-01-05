@@ -1,0 +1,94 @@
+import random
+import matplotlib.pyplot as plt
+import cv2
+import os
+
+# 文明类定义
+class Civilization:
+    def __init__(self, mark, attitude, isPositive, id):
+        self.mark = mark
+        self.attitude = attitude  # 0: 友善, 1: 中立, 2: 好斗
+        self.isPositive = isPositive  # 1: 积极探索, 0: 消极保守
+        self.state = 1  # 1: 存活, 0: 死亡
+        self.id = id
+
+def activeCv(cv1, cv2):
+    """模拟两个文明的互动"""
+    if cv1.attitude == 2 or cv2.attitude == 2:  # 如果任一方好斗，则战斗
+        if cv1.mark > cv2.mark:
+            delta = (cv1.mark + cv2.mark) * 0.2
+            cv1.mark += delta
+            cv2.mark -= delta
+        else:
+            delta = (cv1.mark + cv2.mark) * 0.2
+            cv2.mark += delta
+            cv1.mark -= delta
+    elif cv1.attitude == 0 or cv2.attitude == 0:  # 友善合作
+        delta = (cv1.mark + cv2.mark) * 0.1
+        cv1.mark += delta
+        cv2.mark += delta
+    return cv1, cv2
+
+def checkDead(cv):
+    """检查文明是否灭亡"""
+    if cv.mark <= 0:
+        cv.state = 0
+    return cv
+
+def simulate_universe(max_frames=36000):
+    """模拟宇宙演化"""
+    universe = [Civilization(random.randint(8000, 12000), random.randint(0, 2), random.randint(0, 1), i) for i in range(200)]
+    data_frames = []
+
+    for frame in range(max_frames):
+        if sum(1 for cv in universe if cv.state == 1) <= 1:  # 只剩下一个文明
+            break
+
+        pos_cvs = [cv for cv in universe if cv.isPositive == 1 and cv.state == 1]
+        for cv in pos_cvs:
+            other = random.choice([c for c in universe if c != cv and c.state == 1])
+            cv, other = activeCv(cv, other)
+            cv = checkDead(cv)
+            other = checkDead(other)
+
+        # 收集当前帧的统计数据
+        alive = sum(1 for cv in universe if cv.state == 1)
+        marks = [cv.mark for cv in universe if cv.state == 1]
+        data_frames.append((frame, alive, sum(marks) / len(marks) if marks else 0))
+
+    return data_frames
+
+def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30):
+    """将每一帧数据绘制成图像并保存为视频"""
+    if not os.path.exists("frames"):
+        os.mkdir("frames")
+
+    for i, (frame, alive, avg_mark) in enumerate(data_frames):
+        plt.figure(figsize=(8, 6))
+        plt.title(f"Frame {frame}: Civilizations Alive = {alive}, Avg Mark = {avg_mark:.2f}")
+        plt.bar(["Alive Civilizations", "Average Mark"], [alive, avg_mark], color=["blue", "green"])
+        plt.savefig(f"frames/frame_{i:04d}.png")
+        plt.close()
+
+    # 使用 OpenCV 将图片合成为视频
+    img_array = []
+    for filename in sorted(os.listdir("frames")):
+        if filename.endswith(".png"):
+            img = cv2.imread(os.path.join("frames", filename))
+            height, width, _ = img.shape
+            img_array.append(img)
+
+    out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+    for img in img_array:
+        out.write(img)
+    out.release()
+
+    # 清理临时图片
+    for filename in os.listdir("frames"):
+        os.remove(os.path.join("frames", filename))
+    os.rmdir("frames")
+
+# 主程序
+if __name__ == "__main__":
+    data_frames = simulate_universe(max_frames=36000)  # 模拟20分钟（fps=30时，36000帧）
+    save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30)
