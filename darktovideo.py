@@ -58,7 +58,7 @@ def simulate_universe(max_frames=36000):
 
     return data_frames
 
-def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30):
+def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30, start_index=0):
     """将每一帧数据绘制成图像并保存为视频"""
     if not os.path.exists("frames"):
         os.mkdir("frames")
@@ -67,7 +67,7 @@ def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30):
         plt.figure(figsize=(8, 6))
         plt.title(f"Frame {frame}: Civilizations Alive = {alive}, Avg Mark = {avg_mark:.2f}")
         plt.bar(["Alive Civilizations", "Average Mark"], [alive, avg_mark], color=["blue", "green"])
-        plt.savefig(f"frames/frame_{i:04d}.png")
+        plt.savefig(f"frames/frame_{start_index + i:04d}.png")
         plt.close()
 
     # 使用 OpenCV 将图片合成为视频
@@ -88,7 +88,22 @@ def save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30):
         os.remove(os.path.join("frames", filename))
     os.rmdir("frames")
 
+def manage_video_files(max_files=50):
+    """管理视频文件，循环生成并删除"""
+    file_index = 0
+    while True:
+        data_frames = simulate_universe(max_frames=36000)  # 模拟20分钟（fps=30时，36000帧）
+        video_file = f"{file_index:02d}_res.mp4"
+        save_frames_to_video(data_frames, output_file=video_file, fps=30, start_index=0)
+        
+        # 删除超出最大数量的视频文件
+        if file_index >= max_files:
+            old_video_file = f"{(file_index - max_files):02d}_res.mp4"
+            if os.path.exists(old_video_file):
+                os.remove(old_video_file)
+        
+        file_index += 1
+
 # 主程序
 if __name__ == "__main__":
-    data_frames = simulate_universe(max_frames=36000)  # 模拟20分钟（fps=30时，36000帧）
-    save_frames_to_video(data_frames, output_file="simulation.mp4", fps=30)
+    manage_video_files(max_files=50)  # 管理最多50个视频文件
